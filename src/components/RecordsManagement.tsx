@@ -3,6 +3,9 @@ import { listJobs, listJobRecords, getJobRecordSummary } from '../lib/jobs';
 import type { MigrationJobRecord } from '../types/migration';
 import type { JobRecordSummary } from '../lib/jobs';
 import { StatusBadge } from './StatusBadge';
+import { Button } from './ui/button';
+import { Spinner } from './ui/spinner';
+import { DispatchJobModal } from './DispatchJobModal';
 
 export function RecordsManagement() {
   const [jobs, setJobs] = useState<any[]>([]);
@@ -14,6 +17,9 @@ export function RecordsManagement() {
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
   const pageSize = 50;
+  const [dispatchJob, setDispatchJob] = useState<
+    { id: number; job_key: string; total_records: number } | null
+  >(null);
 
   useEffect(() => {
     (async () => {
@@ -81,21 +87,39 @@ export function RecordsManagement() {
             Inspect individual migration records for a specific job.
           </p>
         </div>
-        <div className="space-y-1 text-xs">
-          <label className="block text-[11px] font-medium text-muted-foreground">
-            Job
-          </label>
-          <select
-            className="h-8 rounded-md border border-input bg-background px-2 text-xs shadow-sm"
-            value={selectedJobId ?? ''}
-            onChange={(e) => setSelectedJobId(e.target.value || null)}
+        <div className="flex flex-col items-stretch gap-2 text-xs sm:flex-row sm:items-end sm:justify-end">
+          <div className="space-y-1">
+            <label className="block text-[11px] font-medium text-muted-foreground">
+              Job
+            </label>
+            <select
+              className="h-8 min-w-[160px] rounded-md border border-input bg-background px-2 text-xs shadow-sm"
+              value={selectedJobId ?? ''}
+              onChange={(e) => setSelectedJobId(e.target.value || null)}
+            >
+              {jobs.map((job) => (
+                <option key={job.id} value={job.id}>
+                  {job.job_key} — {job.status}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            className="sm:ml-2"
+            disabled={!selectedJob}
+            onClick={() => {
+              if (!selectedJob) return;
+              setDispatchJob({
+                id: selectedJob.id,
+                job_key: selectedJob.job_key,
+                total_records: selectedJob.total_records ?? summary?.total ?? 0,
+              });
+            }}
           >
-            {jobs.map((job) => (
-              <option key={job.id} value={job.id}>
-                {job.job_key} — {job.status}
-              </option>
-            ))}
-          </select>
+            Start migration
+          </Button>
         </div>
       </div>
 
@@ -155,9 +179,40 @@ export function RecordsManagement() {
         )}
 
         {loading ? (
-          <p className="px-3 py-4 text-sm text-muted-foreground">Loading records…</p>
+          <div className="flex h-full items-center justify-center py-10 text-xs text-muted-foreground">
+            <Spinner className="mr-2 h-4 w-4" />
+            Loading records…
+          </div>
         ) : (
           <div className="flex min-h-0 max-h-full flex-col">
+            {total > 0 && (
+              <div className="flex items-center justify-between border-b px-3 py-1.5 text-[11px] text-muted-foreground">
+                <span>
+                  Rows {start + 1}-{Math.min(start + pageSize, total)} of {total}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    className="rounded-md border border-input bg-background px-2 py-1 text-[11px] disabled:opacity-50"
+                    disabled={currentPage <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    Prev
+                  </button>
+                  <span>
+                    Page {currentPage} of {pageCount}
+                  </span>
+                  <button
+                    type="button"
+                    className="rounded-md border border-input bg-background px-2 py-1 text-[11px] disabled:opacity-50"
+                    disabled={currentPage >= pageCount}
+                    onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="min-h-0 flex-1 overflow-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-muted/60">
@@ -250,6 +305,26 @@ export function RecordsManagement() {
           </div>
         )}
       </div>
+      {dispatchJob && (
+        <DispatchJobModal
+          job={dispatchJob}
+          onClose={() => setDispatchJob(null)}
+          onSuccess={async () => {
+            if (!selectedJobId) return;
+            setLoading(true);
+            try {
+              const [data, summaryData] = await Promise.all([
+                listJobRecords(selectedJobId),
+                getJobRecordSummary(selectedJobId),
+              ]);
+              setRecords(data);
+              setSummary(summaryData);
+            } finally {
+              setLoading(false);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -92,6 +92,15 @@ A small React + Vite dashboard for managing an Auth0-to-new-system name migratio
    - Choose a job from the dropdown.
    - Use filters and search to inspect status, HTTP codes, and error messages for each record.
 
+## Pages and sidebar
+
+Each sidebar item corresponds to a logical page:
+
+- **Upload**: main upload screen (logical path: `/upload`)
+- **Jobs management**: jobs overview and dispatch (logical path: `/jobs`)
+- **Records management**: per-record inspection for a job (logical path: `/records`)
+- **Settings**: environment variable hints and configuration notes (logical path: `/settings`)
+
 ## Notes
 
 - The UI assumes Supabase RLS rules allow `SELECT`, `DELETE`, and counting on the `migration_jobs` and `migration_job_records` tables for the configured anon key.

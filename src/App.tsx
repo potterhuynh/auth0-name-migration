@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { UploadSection } from './components/UploadSection';
 import { JobsManagement } from './components/JobsManagement';
 import { RecordsManagement } from './components/RecordsManagement';
@@ -6,8 +7,38 @@ import { Button } from './components/ui/button';
 
 type Page = 'upload' | 'jobs' | 'records' | 'settings';
 
+function pageFromPath(pathname: string): Page {
+  if (pathname.startsWith('/jobs')) return 'jobs';
+  if (pathname.startsWith('/records')) return 'records';
+  if (pathname.startsWith('/settings')) return 'settings';
+  return 'upload';
+}
+
+function pathFromPage(page: Page): string {
+  switch (page) {
+    case 'jobs':
+      return '/jobs';
+    case 'records':
+      return '/records';
+    case 'settings':
+      return '/settings';
+    case 'upload':
+    default:
+      return '/upload';
+  }
+}
+
 export default function App() {
-  const [page, setPage] = useState<Page>('upload');
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (location.pathname === '/') {
+      navigate('/upload', { replace: true });
+    }
+  }, [location.pathname, navigate]);
+
+  const page = pageFromPath(location.pathname);
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900">
@@ -27,28 +58,28 @@ export default function App() {
             <Button
               variant={page === 'upload' ? 'default' : 'ghost'}
               className="w-full justify-start"
-              onClick={() => setPage('upload')}
+              onClick={() => navigate(pathFromPage('upload'))}
             >
               Upload
             </Button>
             <Button
               variant={page === 'jobs' ? 'default' : 'ghost'}
               className="w-full justify-start"
-              onClick={() => setPage('jobs')}
+              onClick={() => navigate(pathFromPage('jobs'))}
             >
               Jobs management
             </Button>
             <Button
               variant={page === 'records' ? 'default' : 'ghost'}
               className="w-full justify-start"
-              onClick={() => setPage('records')}
+              onClick={() => navigate(pathFromPage('records'))}
             >
               Records management
             </Button>
             <Button
               variant={page === 'settings' ? 'default' : 'ghost'}
               className="w-full justify-start"
-              onClick={() => setPage('settings')}
+              onClick={() => navigate(pathFromPage('settings'))}
             >
               Settings
             </Button>

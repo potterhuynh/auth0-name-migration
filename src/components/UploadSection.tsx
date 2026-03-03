@@ -1,7 +1,10 @@
 import { useState, useRef } from 'react';
+import toast from 'react-hot-toast';
 import { Upload, FileJson } from 'lucide-react';
 import { Button } from './ui/button';
+import { Spinner } from './ui/spinner';
 import { ingestFile } from '../lib/api';
+import { jobKeyExists } from '../lib/jobs';
 import { cn } from '../lib/cn';
 
 function jobKeyFromFile(file: File): string {
@@ -93,6 +96,14 @@ export function UploadSection() {
     setStatus(null);
 
     try {
+      const jobKey = jobKeyFromFile(file);
+      if (await jobKeyExists(jobKey)) {
+        const msg = `Job key "${jobKey}" already exists. Rename the file or delete the existing job before uploading.`;
+        setStatus(msg);
+        toast.error(msg);
+        return;
+      }
+
       let recordsToUpload = previewRecords;
 
       if (!recordsToUpload.length) {
@@ -102,17 +113,20 @@ export function UploadSection() {
       }
 
       if (!recordsToUpload.length) {
-        setStatus('No records with a valid email-format name to upload.');
+        const msg = 'No records with a valid email-format name to upload.';
+        setStatus(msg);
+        toast.error(msg);
         return;
       }
 
-      const jobKey = jobKeyFromFile(file);
       const res = await ingestFile(jobKey, recordsToUpload);
-      setStatus(
-        `Ingested ${res.total_records ?? recordsToUpload.length} records for job ${res.job_key}`,
-      );
+      const okMsg = `Ingested ${res.total_records ?? recordsToUpload.length} records for job ${res.job_key}`;
+      setStatus(okMsg);
+      toast.success(okMsg);
     } catch (err: unknown) {
-      setStatus(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      const msg = `Error: ${err instanceof Error ? err.message : String(err)}`;
+      setStatus(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -279,7 +293,10 @@ export function UploadSection() {
         </div>
 
         {previewLoading ? (
-          <p className="px-3 py-3 text-xs text-muted-foreground">Parsing file…</p>
+          <div className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
+            <Spinner className="h-3.5 w-3.5" />
+            Parsing file…
+          </div>
         ) : previewError ? (
           <p className="px-3 py-3 text-xs text-red-500">{previewError}</p>
         ) : (
@@ -354,6 +371,7 @@ export function UploadSection() {
       </div>
 
       <Button type="submit" disabled={loading || !file}>
+        {loading && <Spinner className="mr-2 h-3.5 w-3.5" />}
         {loading ? 'Uploading…' : 'Upload & ingest'}
       </Button>
 

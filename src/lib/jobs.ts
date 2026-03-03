@@ -71,6 +71,19 @@ export async function getJobRecordSummary(jobId: string): Promise<JobRecordSumma
   };
 }
 
+export async function jobKeyExists(jobKey: string): Promise<boolean> {
+  const { count, error } = await supabase
+    .from('migration_jobs')
+    .select('id', { count: 'exact', head: true })
+    .eq('job_key', jobKey);
+
+  if (error) {
+    throw error;
+  }
+
+  return (count ?? 0) > 0;
+}
+
 export async function deleteJobRecords(jobId: string): Promise<void> {
   const { error } = await supabase
     .from('migration_job_records')

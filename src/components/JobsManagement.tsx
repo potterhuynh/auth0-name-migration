@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Trash2 } from 'lucide-react';
-import { listJobs, deleteJobAndRecords } from '../lib/jobs';
+import { listJobs, deleteJobAndRecords, getJobRecordSummary } from '../lib/jobs';
 import { Button } from './ui/button';
+import { Spinner } from './ui/spinner';
 import { DispatchJobModal } from './DispatchJobModal';
 import { StatusBadge } from './StatusBadge';
 
@@ -19,7 +20,25 @@ export function JobsManagement() {
     setLoading(true);
     try {
       const data = await listJobs();
-      setJobs(data);
+      const jobsWithCounts = await Promise.all(
+        data.map(async (job: any) => {
+          try {
+            const summary = await getJobRecordSummary(String(job.id));
+            const processed = summary.success + summary.failed;
+            return {
+              ...job,
+              total_records: summary.total,
+              processed_records: processed,
+              success_records: summary.success,
+              failed_records: summary.failed,
+            } as JobRow;
+          } catch {
+            // If summary fails, fall back to existing fields.
+            return job as JobRow;
+          }
+        }),
+      );
+      setJobs(jobsWithCounts);
     } finally {
       setLoading(false);
     }
@@ -39,6 +58,7 @@ export function JobsManagement() {
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={loadJobs} disabled={loading}>
+          {loading && <Spinner className="h-3 w-3" />}
           {loading ? 'Refreshing…' : 'Refresh'}
         </Button>
       </div>
