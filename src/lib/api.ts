@@ -17,11 +17,25 @@ export async function ingestFile(jobKey: string, records: unknown[]) {
   return res.json();
 }
 
-export async function createJob(jobKey: string, limit: number) {
+export async function createJob(jobKey: string, limit: number, status?: string) {
   const res = await fetch(`${API_BASE}/auth0-migration/jobs`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ job_key: jobKey, limit }),
+    body: JSON.stringify({ job_key: jobKey, limit, status }),
+  });
+
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
+
+  return res.json();
+}
+
+export async function retryRecord(userId: string) {
+  const res = await fetch(`${API_BASE}/auth0-migration/jobs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: userId }),
   });
 
   if (!res.ok) {

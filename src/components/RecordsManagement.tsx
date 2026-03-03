@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { listJobs, listJobRecords, getJobRecordSummary } from '../lib/jobs';
 import type { MigrationJobRecord } from '../types/migration';
 import type { JobRecordSummary } from '../lib/jobs';
-import { StatusBadge } from './StatusBadge';
-import { Button } from './ui/button';
 import { Spinner } from './ui/spinner';
 import { DispatchJobModal } from './DispatchJobModal';
+import { retryRecord } from '../lib/api';
+import { RecordsHeader } from './RecordsHeader';
+import { RecordsFilters } from './RecordsFilters';
+import { RecordRow } from './RecordRow';
 
 export function RecordsManagement() {
   const [jobs, setJobs] = useState<any[]>([]);
@@ -78,81 +80,54 @@ export function RecordsManagement() {
   const start = (currentPage - 1) * pageSize;
   const pageRecords = filteredRecords.slice(start, start + pageSize);
 
+  const handleStartMigration = () => {
+    if (!selectedJob) return;
+    setDispatchJob({
+      id: selectedJob.id,
+      job_key: selectedJob.job_key,
+      total_records: selectedJob.total_records ?? summary?.total ?? 0,
+    });
+  };
+
+  const handleRetryRecord = async (userId: string) => {
+    try {
+      await retryRecord(userId);
+      if (!selectedJobId) return;
+      setLoading(true);
+      try {
+        const [data, summaryData] = await Promise.all([
+          listJobRecords(selectedJobId),
+          getJobRecordSummary(selectedJobId),
+        ]);
+        setRecords(data);
+        setSummary(summaryData);
+      } finally {
+        setLoading(false);
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(err);
+    }
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <div className="flex flex-shrink-0 flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-sm font-semibold">Records management</h2>
-          <p className="text-xs text-muted-foreground">
-            Inspect individual migration records for a specific job.
-          </p>
-        </div>
-        <div className="flex flex-col items-stretch gap-2 text-xs sm:flex-row sm:items-end sm:justify-end">
-          <div className="space-y-1">
-            <label className="block text-[11px] font-medium text-muted-foreground">
-              Job
-            </label>
-            <select
-              className="h-8 min-w-[160px] rounded-md border border-input bg-background px-2 text-xs shadow-sm"
-              value={selectedJobId ?? ''}
-              onChange={(e) => setSelectedJobId(e.target.value || null)}
-            >
-              {jobs.map((job) => (
-                <option key={job.id} value={job.id}>
-                  {job.job_key} — {job.status}
-                </option>
-              ))}
-            </select>
-          </div>
-          <Button
-            type="button"
-            size="sm"
-            className="sm:ml-2"
-            disabled={!selectedJob}
-            onClick={() => {
-              if (!selectedJob) return;
-              setDispatchJob({
-                id: selectedJob.id,
-                job_key: selectedJob.job_key,
-                total_records: selectedJob.total_records ?? summary?.total ?? 0,
-              });
-            }}
-          >
-            Start migration
-          </Button>
-        </div>
-      </div>
+      <RecordsHeader
+        jobs={jobs}
+        selectedJobId={selectedJobId}
+        onSelectedJobIdChange={setSelectedJobId}
+        selectedJob={selectedJob}
+        onStartMigration={handleStartMigration}
+      />
 
       <div className="min-h-0 flex-1 rounded-md border bg-card text-card-foreground shadow-sm">
-        <div className="flex flex-wrap items-center gap-2 border-b bg-card px-3 py-2 text-xs text-muted-foreground">
-          <span className="text-[11px] font-medium uppercase tracking-wide">
-            Filters
-          </span>
-          <div className="flex items-center gap-1">
-            <span>Status</span>
-            <select
-              className="h-7 rounded-md border border-input bg-background px-2 text-xs shadow-sm"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="all">All</option>
-              {availableStatuses.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="ml-auto flex min-w-[160px] flex-1 items-center gap-1 sm:min-w-[220px]">
-            <input
-              type="text"
-              placeholder="Filter by user, name, error…"
-              className="h-7 w-full rounded-md border border-input bg-background px-2 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </div>
-        </div>
+        <RecordsFilters
+          statusFilter={statusFilter}
+          availableStatuses={availableStatuses}
+          onStatusFilterChange={setStatusFilter}
+          query={query}
+          onQueryChange={setQuery}
+        />
 
         {summary && (
           <div className="flex flex-wrap items-center gap-3 border-b bg-card/80 px-3 py-2 text-xs text-muted-foreground">
@@ -225,42 +200,17 @@ export function RecordsManagement() {
                     <th className="px-3 py-2 text-left">HTTP</th>
                     <th className="px-3 py-2 text-left">Error</th>
                     <th className="px-3 py-2 text-left">Last attempt</th>
+                    <th className="px-3 py-2 text-left">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {pageRecords.map((r) => (
-                    <tr key={r.user_id} className="border-t border-border/60">
-                      <td className="px-3 py-2 font-mono text-xs">{r.user_id}</td>
-                      <td className="px-3 py-2">{r.name}</td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">
-                        {[r.old_name, r.updated_name].filter(Boolean).join(' → ') || '—'}
-                      </td>
-                      <td className="px-3 py-2">
-                        <StatusBadge status={r.status} />
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        {r.attempts} / {r.max_attempts}
-                      </td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">
-                        {r.last_http_status ?? '—'}
-                      </td>
-                      <td
-                        className="px-3 py-2 max-w-[12rem] truncate text-xs text-red-500"
-                        title={r.last_error_message ?? undefined}
-                      >
-                        {r.last_error_code || r.last_error_message || '—'}
-                      </td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">
-                        {r.last_attempt_at
-                          ? new Date(r.last_attempt_at).toLocaleString()
-                          : '—'}
-                      </td>
-                    </tr>
+                    <RecordRow key={r.user_id} record={r} onRetry={handleRetryRecord} />
                   ))}
                   {!filteredRecords.length && !loading && (
                     <tr>
                       <td
-                        colSpan={8}
+                        colSpan={9}
                         className="px-3 py-4 text-center text-xs text-muted-foreground"
                       >
                         {records.length
@@ -328,4 +278,3 @@ export function RecordsManagement() {
     </div>
   );
 }
-

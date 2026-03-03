@@ -14,6 +14,7 @@ type DispatchJobModalProps = {
 export function DispatchJobModal({ job, onClose, onSuccess }: DispatchJobModalProps) {
   const [limit, setLimit] = useState(100);
   const [useAll, setUseAll] = useState(false);
+  const [status, setStatus] = useState<string>('pending');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,6 +22,7 @@ export function DispatchJobModal({ job, onClose, onSuccess }: DispatchJobModalPr
     if (job) {
       setLimit(100);
       setUseAll(false);
+      setStatus('pending');
       setError(null);
     }
   }, [job]);
@@ -34,7 +36,7 @@ export function DispatchJobModal({ job, onClose, onSuccess }: DispatchJobModalPr
     setLoading(true);
     setError(null);
     try {
-      await createJob(job.job_key, effectiveLimit);
+      await createJob(job.job_key, effectiveLimit, status);
       onSuccess();
       onClose();
     } catch (err) {
@@ -86,6 +88,24 @@ export function DispatchJobModal({ job, onClose, onSuccess }: DispatchJobModalPr
                 )}
               />
             )}
+          </div>
+          <div className="space-y-1">
+            <label className="block text-sm">Status to process</label>
+            <select
+              className={cn(
+                'w-full rounded-md border border-input bg-background px-3 py-2 text-sm',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              )}
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              <option value="pending">pending</option>
+              <option value="processing">processing</option>
+              <option value="success">success</option>
+              <option value="failed">failed</option>
+              <option value="retrying">retrying</option>
+              <option value="skipped">skipped</option>
+            </select>
           </div>
           <div>
             <label className="flex items-center gap-2 text-sm">
