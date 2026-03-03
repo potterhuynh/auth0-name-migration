@@ -31,11 +31,11 @@ export async function createJob(jobKey: string, limit: number, status?: string) 
   return res.json();
 }
 
-export async function retryRecord(userId: string) {
+export async function retryRecord(jobKey: string, userId: string) {
   const res = await fetch(`${API_BASE}/auth0-migration/jobs`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: userId }),
+    body: JSON.stringify({ job_key: jobKey, user_id: userId }),
   });
 
   if (!res.ok) {

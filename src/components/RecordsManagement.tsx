@@ -4,7 +4,6 @@ import type { MigrationJobRecord } from '../types/migration';
 import type { JobRecordSummary } from '../lib/jobs';
 import { Spinner } from './ui/spinner';
 import { DispatchJobModal } from './DispatchJobModal';
-import { retryRecord } from '../lib/api';
 import { RecordsHeader } from './RecordsHeader';
 import { RecordsFilters } from './RecordsFilters';
 import { RecordRow } from './RecordRow';
@@ -89,25 +88,14 @@ export function RecordsManagement() {
     });
   };
 
-  const handleRetryRecord = async (userId: string) => {
-    try {
-      await retryRecord(userId);
-      if (!selectedJobId) return;
-      setLoading(true);
-      try {
-        const [data, summaryData] = await Promise.all([
-          listJobRecords(selectedJobId),
-          getJobRecordSummary(selectedJobId),
-        ]);
-        setRecords(data);
-        setSummary(summaryData);
-      } finally {
-        setLoading(false);
-      }
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error(err);
-    }
+  const refreshSelectedJobData = async () => {
+    if (!selectedJobId) return;
+    const [data, summaryData] = await Promise.all([
+      listJobRecords(selectedJobId),
+      getJobRecordSummary(selectedJobId),
+    ]);
+    setRecords(data);
+    setSummary(summaryData);
   };
 
   return (
@@ -205,7 +193,12 @@ export function RecordsManagement() {
                 </thead>
                 <tbody>
                   {pageRecords.map((r) => (
-                    <RecordRow key={r.user_id} record={r} onRetry={handleRetryRecord} />
+                    <RecordRow
+                      key={r.user_id}
+                      record={r}
+                      jobKey={selectedJob?.job_key ?? null}
+                      onRefresh={refreshSelectedJobData}
+                    />
                   ))}
                   {!filteredRecords.length && !loading && (
                     <tr>

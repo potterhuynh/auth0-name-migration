@@ -1,13 +1,31 @@
+import { useState } from 'react';
 import type { MigrationJobRecord } from '../types/migration';
+import { retryRecord } from '../lib/api';
 import { StatusBadge } from './StatusBadge';
 import { Button } from './ui/button';
 
 type RecordRowProps = {
   record: MigrationJobRecord;
-  onRetry: (userId: string) => void | Promise<void>;
+  jobKey: string | null;
+  onRefresh: () => void | Promise<void>;
 };
 
-export function RecordRow({ record, onRetry }: RecordRowProps) {
+export function RecordRow({ record, jobKey, onRefresh }: RecordRowProps) {
+  const [isRetrying, setIsRetrying] = useState(false);
+
+  const handleRetry = async () => {
+    if (!jobKey || isRetrying) return;
+    try {
+      setIsRetrying(true);
+      await retryRecord(jobKey, record.user_id);
+      await onRefresh();
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(err);
+    } finally {
+      setIsRetrying(false);
+    }
+  };
   return (
     <tr className="border-t border-border/60">
       <td className="px-3 py-2 font-mono text-xs">{record.user_id}</td>
@@ -39,9 +57,16 @@ export function RecordRow({ record, onRetry }: RecordRowProps) {
             type="button"
             size="sm"
             variant="outline"
-            onClick={() => onRetry(record.user_id)}
+            disabled={isRetrying || !jobKey}
+            onClick={handleRetry}
           >
-            Retry
+            {isRetrying
+              ? record.status === 'pending'
+                ? 'Starting…'
+                : 'Retrying…'
+              : record.status === 'pending'
+                ? 'Start'
+                : 'Retry'}
           </Button>
         )}
       </td>
