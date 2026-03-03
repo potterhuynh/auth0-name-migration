@@ -108,8 +108,8 @@ export function UploadSection() {
 
       if (!recordsToUpload.length) {
         // Fallback: parse file now if preview hasn't run or failed.
-        const { records } = await parseFileToEmailRecords(file);
-        recordsToUpload = records;
+        const { validRecords } = await parseFileToEmailRecords(file);
+        recordsToUpload = validRecords;
       }
 
       if (!recordsToUpload.length) {
