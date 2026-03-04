@@ -4,7 +4,6 @@ export interface MigrationJobRecord {
   job_id: string;
   user_id: string;
   name: string;
-  source_hash: string;
   // denormalized / audit fields
   identities?: unknown | null;
   raw_user?: unknown | null;

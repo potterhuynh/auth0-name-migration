@@ -28,7 +28,7 @@ export async function listJobRecords(jobId: string): Promise<MigrationJobRecord[
   const { data, error } = await supabase
     .from('migration_job_records')
     .select(
-      'job_id, user_id, name, source_hash, status, attempts, max_attempts, last_error_code, last_error_message, last_http_status, auth0_request_id, old_name, updated_name, queued_at, first_attempt_at, last_attempt_at, completed_at, created_at, updated_at',
+      'job_id, user_id, name, status, attempts, max_attempts, last_error_code, last_error_message, last_http_status, auth0_request_id, old_name, updated_name, queued_at, first_attempt_at, last_attempt_at, completed_at, created_at, updated_at',
     )
     .eq('job_id', jobId)
     .order('user_id', { ascending: true })
