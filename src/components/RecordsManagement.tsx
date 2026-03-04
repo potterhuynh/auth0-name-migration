@@ -1,18 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { listJobs, listJobRecords, getJobRecordSummary } from '../lib/jobs';
 import type { MigrationJobRecord } from '../types/migration';
 import type { JobRecordSummary } from '../lib/jobs';
+import { supabase } from '../lib/supabase';
 import { Spinner } from './ui/spinner';
 import { DispatchJobModal } from './DispatchJobModal';
 import { RecordsHeader } from './RecordsHeader';
 import { RecordsFilters } from './RecordsFilters';
 import { RecordRow } from './RecordRow';
 
+type JobRow = {
+  id: number;
+  job_key: string;
+  total_records?: number | null;
+};
+
 export function RecordsManagement() {
-  const [jobs, setJobs] = useState<any[]>([]);
+  const [jobs, setJobs] = useState<JobRow[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [records, setRecords] = useState<MigrationJobRecord[]>([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [summary, setSummary] = useState<JobRecordSummary | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [query, setQuery] = useState('');
@@ -32,22 +40,71 @@ export function RecordsManagement() {
     })();
   }, [selectedJobId]);
 
-  useEffect(() => {
-    if (!selectedJobId) return;
-    (async () => {
-      setLoading(true);
+  const refreshSelectedJobData = useCallback(
+    async (jobId: string, mode: 'initial' | 'refresh' = 'refresh') => {
+      if (mode === 'initial') {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
       try {
         const [data, summaryData] = await Promise.all([
-          listJobRecords(selectedJobId),
-          getJobRecordSummary(selectedJobId),
+          listJobRecords(jobId),
+          getJobRecordSummary(jobId),
         ]);
         setRecords(data);
         setSummary(summaryData);
       } finally {
-        setLoading(false);
+        if (mode === 'initial') {
+          setLoading(false);
+        } else {
+          setRefreshing(false);
+        }
       }
-    })();
-  }, [selectedJobId]);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!selectedJobId) return;
+    setRecords([]);
+    setSummary(null);
+    void refreshSelectedJobData(selectedJobId, 'initial');
+  }, [refreshSelectedJobData, selectedJobId]);
+
+  useEffect(() => {
+    if (!selectedJobId) return;
+
+    let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
+    const scheduleRefresh = () => {
+      if (refreshTimeout) return;
+      refreshTimeout = setTimeout(() => {
+        refreshTimeout = null;
+        void refreshSelectedJobData(selectedJobId);
+      }, 300);
+    };
+
+    const channel = supabase
+      .channel(`migration-job-records-${selectedJobId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'migration_job_records',
+          filter: `job_id=eq.${selectedJobId}`,
+        },
+        scheduleRefresh,
+      )
+      .subscribe();
+
+    return () => {
+      if (refreshTimeout) {
+        clearTimeout(refreshTimeout);
+      }
+      void supabase.removeChannel(channel);
+    };
+  }, [refreshSelectedJobData, selectedJobId]);
 
   useEffect(() => {
     setPage(1);
@@ -86,16 +143,6 @@ export function RecordsManagement() {
       job_key: selectedJob.job_key,
       total_records: selectedJob.total_records ?? summary?.total ?? 0,
     });
-  };
-
-  const refreshSelectedJobData = async () => {
-    if (!selectedJobId) return;
-    const [data, summaryData] = await Promise.all([
-      listJobRecords(selectedJobId),
-      getJobRecordSummary(selectedJobId),
-    ]);
-    setRecords(data);
-    setSummary(summaryData);
   };
 
   return (
@@ -141,13 +188,19 @@ export function RecordsManagement() {
           </div>
         )}
 
-        {loading ? (
+        {loading && records.length === 0 ? (
           <div className="flex h-full items-center justify-center py-10 text-xs text-muted-foreground">
             <Spinner className="mr-2 h-4 w-4" />
             Loading records…
           </div>
         ) : (
           <div className="flex min-h-0 max-h-full flex-col">
+            {refreshing && (
+              <div className="flex items-center gap-2 border-b px-3 py-1.5 text-[11px] text-muted-foreground">
+                <Spinner className="h-3 w-3" />
+                Refreshing…
+              </div>
+            )}
             {total > 0 && (
               <div className="flex items-center justify-between border-b px-3 py-1.5 text-[11px] text-muted-foreground">
                 <span>
@@ -197,10 +250,14 @@ export function RecordsManagement() {
                       key={r.user_id}
                       record={r}
                       jobKey={selectedJob?.job_key ?? null}
-                      onRefresh={refreshSelectedJobData}
+                      onRefresh={() =>
+                        selectedJobId
+                          ? refreshSelectedJobData(selectedJobId)
+                          : Promise.resolve()
+                      }
                     />
                   ))}
-                  {!filteredRecords.length && !loading && (
+                  {!filteredRecords.length && (
                     <tr>
                       <td
                         colSpan={9}
@@ -254,17 +311,7 @@ export function RecordsManagement() {
           onClose={() => setDispatchJob(null)}
           onSuccess={async () => {
             if (!selectedJobId) return;
-            setLoading(true);
-            try {
-              const [data, summaryData] = await Promise.all([
-                listJobRecords(selectedJobId),
-                getJobRecordSummary(selectedJobId),
-              ]);
-              setRecords(data);
-              setSummary(summaryData);
-            } finally {
-              setLoading(false);
-            }
+            await refreshSelectedJobData(selectedJobId);
           }}
         />
       )}

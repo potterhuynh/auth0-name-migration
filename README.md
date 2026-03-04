@@ -44,8 +44,8 @@ A small React + Vite dashboard for managing an Auth0-to-new-system name migratio
     - `migration_jobs`
     - `migration_job_records`
   - HTTP API for ingestion and job dispatch:
-    - `POST /auth0-migration/ingest?job_key=...`
-    - `POST /auth0-migration/jobs`
+    - `POST /ingest?job_key=...`
+    - `POST /jobs`
 
 ## Getting started
 

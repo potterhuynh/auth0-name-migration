@@ -1,4 +1,4 @@
-import type { ComponentType, FormEvent, ReactNode } from 'react';
+import type { ComponentType, FormEvent, ReactElement } from 'react';
 import { useEffect, useState } from 'react';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -45,10 +45,10 @@ function writeStoredAuth(): void {
   }
 }
 
-export function withPasswordAuth<P>(
+export function withPasswordAuth<P extends object>(
   WrappedComponent: ComponentType<P>,
 ): ComponentType<P> {
-  function ComponentWithAuth(props: P): ReactNode {
+  function ComponentWithAuth(props: P): ReactElement | null {
     const [status, setStatus] = useState<AuthStatus>('checking');
     const [password, setPassword] = useState('');
     const [error, setError] = useState<string | null>(null);

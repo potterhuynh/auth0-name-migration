@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Button } from './ui/button';
-import { createJob } from '../lib/api';
+import { startBackfill } from '../lib/api';
 
-type CreateJobSectionProps = {
+type StartNameBackfillSectionProps = {
   variant?: 'default' | 'inline';
 };
 
-export function CreateJobSection({ variant = 'default' }: CreateJobSectionProps) {
+export function StartNameBackfillSection({ variant = 'default' }: StartNameBackfillSectionProps) {
   const [jobKey, setJobKey] = useState('job-local-001');
   const [limit, setLimit] = useState(100);
   const [status, setStatus] = useState<string | null>(null);
@@ -18,7 +18,7 @@ export function CreateJobSection({ variant = 'default' }: CreateJobSectionProps)
     setStatus(null);
 
     try {
-      const res = await createJob(jobKey, limit);
+      const res = await startBackfill(jobKey, limit);
       setStatus(
         `${res.message} — processed/queued ${res.count} records for job ${res.job_key}`,
       );
@@ -53,7 +53,7 @@ export function CreateJobSection({ variant = 'default' }: CreateJobSectionProps)
           onChange={(e) => setLimit(Number(e.target.value))}
         />
         <Button type="submit" size="sm" disabled={loading}>
-          {loading ? 'Creating…' : 'Create job / dispatch'}
+          {loading ? 'Starting…' : 'Start name backfill'}
         </Button>
         {status && (
           <span className="w-full text-xs text-muted-foreground sm:w-auto">
@@ -90,11 +90,10 @@ export function CreateJobSection({ variant = 'default' }: CreateJobSectionProps)
       </div>
 
       <Button type="submit" disabled={loading}>
-        {loading ? 'Creating job…' : 'Create job / dispatch'}
+        {loading ? 'Starting name backfill…' : 'Start name backfill'}
       </Button>
 
       {status && <p className="text-sm text-slate-600">{status}</p>}
     </form>
   );
 }
-

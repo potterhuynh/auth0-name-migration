@@ -2,7 +2,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL as string;
 
 export async function ingestFile(jobKey: string, records: unknown[]) {
   const res = await fetch(
-    `${API_BASE}/auth0-migration/ingest?job_key=${encodeURIComponent(jobKey)}`,
+    `${API_BASE}/ingest?job_key=${encodeURIComponent(jobKey)}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -17,8 +17,8 @@ export async function ingestFile(jobKey: string, records: unknown[]) {
   return res.json();
 }
 
-export async function createJob(jobKey: string, limit: number, status?: string) {
-  const res = await fetch(`${API_BASE}/auth0-migration/jobs`, {
+export async function startBackfill(jobKey: string, limit: number, status?: string) {
+  const res = await fetch(`${API_BASE}/start-backfill`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ job_key: jobKey, limit, status }),
@@ -32,7 +32,7 @@ export async function createJob(jobKey: string, limit: number, status?: string) 
 }
 
 export async function retryRecord(jobKey: string, userId: string) {
-  const res = await fetch(`${API_BASE}/auth0-migration/jobs`, {
+  const res = await fetch(`${API_BASE}/start-backfill`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ job_key: jobKey, user_id: userId }),

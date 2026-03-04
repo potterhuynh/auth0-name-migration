@@ -54,7 +54,7 @@ export function JobsManagement() {
         <div>
           <h2 className="text-sm font-semibold">Jobs management</h2>
           <p className="text-xs text-muted-foreground">
-            View and refresh recent migration jobs. Use Create job to dispatch.
+            View and refresh recent migration jobs. Use Start name backfill to dispatch.
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={loadJobs} disabled={loading}>
@@ -94,7 +94,7 @@ export function JobsManagement() {
                       variant="outline"
                       onClick={() => setDispatchJob(job)}
                     >
-                      Create job
+                      Start name backfill
                     </Button>
                     <Button
                       size="sm"

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { createJob } from '../lib/api';
+import { startBackfill } from '../lib/api';
 import { Button } from './ui/button';
 import { cn } from '../lib/cn';
 
@@ -15,7 +15,6 @@ export function DispatchJobModal({ job, onClose, onSuccess }: DispatchJobModalPr
   const [limit, setLimit] = useState(100);
   const [useAll, setUseAll] = useState(false);
   const [status, setStatus] = useState<string>('pending');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -33,16 +32,13 @@ export function DispatchJobModal({ job, onClose, onSuccess }: DispatchJobModalPr
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
+    onClose();
     try {
-      await createJob(job.job_key, effectiveLimit, status);
-      onSuccess();
-      onClose();
+      await startBackfill(job.job_key, effectiveLimit, status);
+      await Promise.resolve(onSuccess());
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
+      console.error('Failed to dispatch job', err);
     }
   };
 
@@ -59,7 +55,7 @@ export function DispatchJobModal({ job, onClose, onSuccess }: DispatchJobModalPr
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="dispatch-modal-title" className="text-sm font-semibold">
-          Create job / dispatch
+          Start name backfill
         </h2>
         <p className="mt-1 text-xs text-muted-foreground">
           Job: <span className="font-mono">{job.job_key}</span>
@@ -125,8 +121,8 @@ export function DispatchJobModal({ job, onClose, onSuccess }: DispatchJobModalPr
             <Button type="button" variant="outline" size="sm" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" size="sm" disabled={loading}>
-              {loading ? 'Dispatching…' : 'Dispatch'}
+            <Button type="submit" size="sm">
+              Dispatch
             </Button>
           </div>
         </form>

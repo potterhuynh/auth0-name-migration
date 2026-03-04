@@ -97,7 +97,7 @@ export default function App() {
               Auth0 Name Migration Dashboard
             </h1>
             <p className="mt-1 text-xs text-slate-500">
-              Upload JSON files, create jobs, and monitor Supabase history.
+              Upload JSON files, start name backfill, and monitor Supabase history.
             </p>
           </header>
 
