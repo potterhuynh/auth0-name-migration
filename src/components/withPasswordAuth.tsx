@@ -4,7 +4,7 @@ import { Input } from './ui/input';
 import { Button } from './ui/button';
 
 const STORAGE_KEY = 'simple_password_auth';
-const PASSWORD = import.meta.env.VITE_SIMPLE_PASSWORD_AUTH ?? 'vietnam';
+const PASSWORD = import.meta.env.VITE_SIMPLE_PASSWORD_AUTH;
 const ONE_HOUR_MS = Number(
   import.meta.env.VITE_SIMPLE_PASSWORD_AUTH_TTL_MS ?? 60 * 60 * 1000,
 );
