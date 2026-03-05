@@ -306,6 +306,8 @@ export function UploadSection() {
     setPreviewQuery('');
     setPreviewError(null);
     setPage(1);
+    setPreviewRecords([]);
+    setSkippedRecords([]);
   };
 
   return (
@@ -541,7 +543,16 @@ export function UploadSection() {
             </SheetDescription>
           </SheetHeader>
 
-          <div className="flex min-h-0 flex-1 flex-col">
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            {previewLoading && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/50 backdrop-blur-sm">
+                <div className="flex flex-col items-center gap-2">
+                  <Spinner className="h-5 w-5" />
+                  <p className="text-xs font-medium text-slate-700">Parsing file…</p>
+                </div>
+              </div>
+            )}
+            
             <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2 text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -610,12 +621,7 @@ export function UploadSection() {
               </div>
             </div>
 
-            {previewLoading ? (
-              <div className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
-                <Spinner className="h-3.5 w-3.5" />
-                Parsing file…
-              </div>
-            ) : previewError ? (
+            {previewError ? (
               <p className="px-3 py-3 text-xs text-red-500">{previewError}</p>
             ) : (
               <div className="min-h-0 flex-1 overflow-auto">

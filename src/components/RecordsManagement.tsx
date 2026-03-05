@@ -32,7 +32,7 @@ export function RecordsManagement() {
     { id: number; job_key: string; total_records: number } | null
   >(null);
   const { supabaseClient } = useSupabaseClientSelection();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const jobIdFromUrl = searchParams.get('job_id');
 
   useEffect(() => {
@@ -49,6 +49,13 @@ export function RecordsManagement() {
       }
     })();
   }, [jobIdFromUrl, supabaseClient]);
+
+  // Update URL when selectedJobId changes
+  useEffect(() => {
+    if (selectedJobId) {
+      setSearchParams({ job_id: selectedJobId }, { replace: true });
+    }
+  }, [selectedJobId, setSearchParams]);
 
   const refreshSelectedJobData = useCallback(
     async (jobId: string, mode: 'initial' | 'refresh' = 'refresh') => {
@@ -96,7 +103,7 @@ export function RecordsManagement() {
 
     const supabase = getSupabaseClient(supabaseClient);
     const channel = supabase
-      .channel(`migration-job-records-${selectedJobId}`)
+      .channel(`migration-job-records-${selectedJobId}-${supabaseClient}`)
       .on(
         'postgres_changes',
         {
@@ -113,7 +120,7 @@ export function RecordsManagement() {
       if (refreshTimeout) {
         clearTimeout(refreshTimeout);
       }
-      void supabase.removeChannel(channel);
+      void channel.unsubscribe();
     };
   }, [refreshSelectedJobData, selectedJobId, supabaseClient]);
 
