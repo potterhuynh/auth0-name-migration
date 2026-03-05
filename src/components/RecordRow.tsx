@@ -2,8 +2,8 @@ import { useState } from 'react';
 import type { MigrationJobRecord } from '../types/migration';
 import { retryRecord } from '../lib/api';
 import { StatusBadge } from './StatusBadge';
-import { Button } from './ui/button';
 import { useSupabaseClientSelection } from './SupabaseClientContext';
+import { Button } from './ui/button';
 
 type Auth0Identity = {
   provider?: string;
@@ -91,7 +91,7 @@ export function RecordRow({ record, jobKey, onRefresh }: RecordRowProps) {
         {appleName || '—'}
       </td>
       <td className="px-3 py-2 text-xs text-muted-foreground">
-        {[record.old_name, record.updated_name].filter(Boolean).join(' → ') || '—'}
+        {record.job_id}
       </td>
       <td className="px-3 py-2">
         <StatusBadge status={record.status} />

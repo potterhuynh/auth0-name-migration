@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Trash2, ExternalLink } from 'lucide-react';
-import { listJobs, deleteJobAndRecords, getJobRecordSummary } from '../lib/jobs';
+import {
+  listJobs,
+  deleteJobAndRecords,
+  getJobRecordSummary,
+  getAllJobRecordsCount,
+} from '../lib/jobs';
 import { Button } from './ui/button';
 import { Spinner } from './ui/spinner';
 import { StatusBadge } from './StatusBadge';
@@ -15,6 +20,7 @@ export function JobsManagement() {
   const [page, setPage] = useState(1);
   const pageSize = 20;
   const [totalJobs, setTotalJobs] = useState(0);
+  const [totalRecordsAllJobs, setTotalRecordsAllJobs] = useState(0);
   const [jobToDelete, setJobToDelete] = useState<JobRow | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -24,10 +30,13 @@ export function JobsManagement() {
   const loadJobs = async (pageToLoad: number) => {
     setLoading(true);
     try {
-      const { jobs: data, total } = await listJobs<JobRow>(supabaseClient, {
-        page: pageToLoad,
-        pageSize,
-      });
+      const [{ jobs: data, total }, allRecordsCount] = await Promise.all([
+        listJobs<JobRow>(supabaseClient, {
+          page: pageToLoad,
+          pageSize,
+        }),
+        getAllJobRecordsCount(supabaseClient),
+      ]);
       const jobsWithCounts = await Promise.all(
         data.map(async (job: any) => {
           try {
@@ -48,6 +57,7 @@ export function JobsManagement() {
       );
       setJobs(jobsWithCounts);
       setTotalJobs(total);
+      setTotalRecordsAllJobs(allRecordsCount);
     } finally {
       setLoading(false);
     }
@@ -74,6 +84,9 @@ export function JobsManagement() {
           <h2 className="text-sm font-semibold">Jobs management</h2>
           <p className="text-xs text-muted-foreground">
             View and refresh recent migration jobs. Open records to view a job’s migration records.
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Total records in all jobs: <span className="font-semibold text-foreground">{totalRecordsAllJobs}</span>
           </p>
         </div>
         <Button
@@ -118,9 +131,9 @@ export function JobsManagement() {
             </div>
           </div>
         )}
-        <div className="min-h-0 flex-1 overflow-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-muted/60">
+            <div className="min-h-0 flex-1 overflow-auto">
+              <table className="min-w-full text-sm">
+                <thead className="sticky top-0 z-10 bg-muted/60 [&_th]:bg-muted/60">
               <tr>
                 <th className="px-3 py-2 text-left">Job key</th>
                 <th className="px-3 py-2 text-left">Status</th>

@@ -43,6 +43,8 @@ A small React + Vite dashboard for managing an Auth0-to-new-system name migratio
   - Tables (expected):
     - `migration_jobs`
     - `migration_job_records`
+    - `upload_history` (optional; see `supabase/migrations/` for SQL)
+  - Storage bucket: `migration-uploads` (optional; for saving uploaded JSON files)
   - HTTP API for ingestion and job dispatch:
     - `POST /ingest?job_key=...`
     - `POST /jobs`
@@ -104,5 +106,6 @@ Each sidebar item corresponds to a logical page:
 ## Notes
 
 - The UI assumes Supabase RLS rules allow `SELECT`, `DELETE`, and counting on the `migration_jobs` and `migration_job_records` tables for the configured anon key.
+- **Uploads**: On each successful ingest, the app uploads the JSON file to the Supabase Storage bucket `migration-uploads` and inserts a row into `upload_history`. Create the bucket in the Supabase dashboard (Storage → New bucket → name `migration-uploads`, allow public or use RLS as needed). Run the migration in `supabase/migrations/` to create the `upload_history` table; if the table or bucket is missing, the job is still created but a warning is shown.
 - Status values are expected to be lowercase strings such as `success`, `failed`, `pending`, etc.; the UI renders them as uppercase badges with color.
 

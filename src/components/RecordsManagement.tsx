@@ -243,7 +243,7 @@ export function RecordsManagement() {
             )}
             <div className="min-h-0 flex-1 overflow-auto">
               <table className="min-w-full text-sm">
-                <thead className="bg-muted/60">
+                <thead className="sticky top-0 z-10 bg-muted/60 [&_th]:bg-muted/60">
                   <tr>
                     <th className="px-3 py-2 text-left">User ID</th>
                     <th className="px-3 py-2 text-left">Name</th>

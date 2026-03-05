@@ -119,6 +119,21 @@ export async function getJobRecordSummary(
   };
 }
 
+export async function getAllJobRecordsCount(
+  client: SupabaseClientName,
+): Promise<number> {
+  const supabase = getSupabaseClient(client);
+  const { count, error } = await supabase
+    .from('migration_job_records')
+    .select('user_id', { count: 'exact', head: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return count ?? 0;
+}
+
 export async function jobKeyExists(
   jobKey: string,
   client: SupabaseClientName,
@@ -168,5 +183,64 @@ export async function deleteJobAndRecords(
 ): Promise<void> {
   await deleteJobRecords(String(job.id), client);
   await deleteJob(job.id, client);
+}
+
+type SearchRecordsFilter = {
+  query?: string;
+  status?: string;
+  jobId?: string;
+};
+
+type SearchRecordsOptions = {
+  page?: number;
+  pageSize?: number;
+  filters?: SearchRecordsFilter;
+};
+
+export async function searchRecords(
+  client: SupabaseClientName,
+  options: SearchRecordsOptions = {},
+): Promise<ListJobsPageResult<MigrationJobRecord>> {
+  const supabase = getSupabaseClient(client);
+  const page = options.page ?? 1;
+  const pageSize = options.pageSize ?? 50;
+  const from = Math.max(0, (page - 1) * pageSize);
+  const to = from + pageSize - 1;
+  const filters = options.filters ?? {};
+
+  let query = supabase
+    .from('migration_job_records')
+    .select(
+      'job_id, user_id, name, raw_user, status, attempts, max_attempts, last_error_code, last_error_message, last_http_status, auth0_request_id, old_name, updated_name, queued_at, first_attempt_at, last_attempt_at, completed_at, created_at, updated_at',
+      { count: 'exact' },
+    );
+
+  if (filters.query) {
+    const searchTerm = `%${filters.query}%`;
+    query = query.or(
+      `user_id.ilike.${searchTerm},name.ilike.${searchTerm},raw_user->>email.ilike.${searchTerm}`,
+    );
+  }
+
+  if (filters.status && filters.status !== 'all') {
+    query = query.eq('status', filters.status);
+  }
+
+  if (filters.jobId) {
+    query = query.eq('job_id', filters.jobId);
+  }
+
+  query = query.order('updated_at', { ascending: false }).range(from, to);
+
+  const { data, error, count } = await query;
+
+  if (error) {
+    throw error;
+  }
+
+  return {
+    jobs: (data ?? []) as MigrationJobRecord[],
+    total: count ?? (data?.length ?? 0),
+  };
 }
 

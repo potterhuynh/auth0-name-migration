@@ -3,14 +3,16 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { UploadSection } from './components/UploadSection';
 import { JobsManagement } from './components/JobsManagement';
 import { RecordsManagement } from './components/RecordsManagement';
+import { SearchRecords } from './components/SearchRecords';
 import { Button } from './components/ui/button';
 import { useSupabaseClientSelection } from './components/SupabaseClientContext';
 
-type Page = 'upload' | 'jobs' | 'records' | 'settings';
+type Page = 'upload' | 'jobs' | 'records' | 'search' | 'settings';
 
 function pageFromPath(pathname: string): Page {
   if (pathname.startsWith('/jobs')) return 'jobs';
   if (pathname.startsWith('/records')) return 'records';
+  if (pathname.startsWith('/search')) return 'search';
   if (pathname.startsWith('/settings')) return 'settings';
   return 'upload';
 }
@@ -21,6 +23,8 @@ function pathFromPage(page: Page): string {
       return '/jobs';
     case 'records':
       return '/records';
+    case 'search':
+      return '/search';
     case 'settings':
       return '/settings';
     case 'upload':
@@ -56,31 +60,70 @@ export default function App() {
             </p>
           </div>
 
+          <div className="mb-4">
+            <span className="text-xs font-medium text-slate-500">
+              Supabase client
+            </span>
+            <div className="mt-1.5 inline-flex w-full rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs shadow-sm">
+              <button
+                type="button"
+                className={`flex-1 rounded-md px-2 py-1.5 transition-colors ${
+                  supabaseClient === 'primary'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-emerald-50 hover:text-emerald-700'
+                }`}
+                aria-pressed={supabaseClient === 'primary'}
+                onClick={() => setSupabaseClient('primary')}
+              >
+                Primary
+              </button>
+              <button
+                type="button"
+                className={`flex-1 rounded-md px-2 py-1.5 transition-colors ${
+                  supabaseClient === 'secondary'
+                    ? 'bg-amber-500 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-amber-50 hover:text-amber-700'
+                }`}
+                aria-pressed={supabaseClient === 'secondary'}
+                onClick={() => setSupabaseClient('secondary')}
+              >
+                Secondary
+              </button>
+            </div>
+          </div>
+
           <nav className="space-y-1 text-sm">
             <Button
               variant={page === 'upload' ? 'default' : 'ghost'}
-              className="w-full justify-start"
+              className={`w-full justify-start ${page === 'upload' ? 'bg-emerald-600 text-white hover:bg-emerald-600/90' : ''}`}
               onClick={() => navigate(pathFromPage('upload'))}
             >
               Upload
             </Button>
             <Button
               variant={page === 'jobs' ? 'default' : 'ghost'}
-              className="w-full justify-start"
+              className={`w-full justify-start ${page === 'jobs' ? 'bg-emerald-600 text-white hover:bg-emerald-600/90' : ''}`}
               onClick={() => navigate(pathFromPage('jobs'))}
             >
               Jobs management
             </Button>
             <Button
               variant={page === 'records' ? 'default' : 'ghost'}
-              className="w-full justify-start"
+              className={`w-full justify-start ${page === 'records' ? 'bg-emerald-600 text-white hover:bg-emerald-600/90' : ''}`}
               onClick={() => navigate(pathFromPage('records'))}
             >
               Records management
             </Button>
             <Button
+              variant={page === 'search' ? 'default' : 'ghost'}
+              className={`w-full justify-start ${page === 'search' ? 'bg-emerald-600 text-white hover:bg-emerald-600/90' : ''}`}
+              onClick={() => navigate(pathFromPage('search'))}
+            >
+              Search records
+            </Button>
+            <Button
               variant={page === 'settings' ? 'default' : 'ghost'}
-              className="w-full justify-start"
+              className={`w-full justify-start ${page === 'settings' ? 'bg-emerald-600 text-white hover:bg-emerald-600/90' : ''}`}
               onClick={() => navigate(pathFromPage('settings'))}
             >
               Settings
@@ -94,50 +137,6 @@ export default function App() {
 
         {/* Main content */}
         <main className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto">
-          <header className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h1 className="text-base font-semibold tracking-tight md:text-lg">
-                  Auth0 Name Migration Dashboard
-                </h1>
-                <p className="mt-1 text-xs text-slate-500">
-                  Upload JSON files, start name backfill, and monitor Supabase history.
-                </p>
-              </div>
-              <div className="flex justify-start md:justify-end">
-                <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs shadow-sm">
-                  <span className="text-slate-500">Supabase client</span>
-                  <div className="inline-flex rounded-full bg-white p-0.5">
-                    <button
-                      type="button"
-                      className={`rounded-full px-2 py-0.5 text-xs transition-colors ${
-                        supabaseClient === 'primary'
-                          ? 'bg-slate-900 text-slate-50 shadow-sm'
-                          : 'text-slate-700 hover:text-slate-900'
-                      }`}
-                      aria-pressed={supabaseClient === 'primary'}
-                      onClick={() => setSupabaseClient('primary')}
-                    >
-                      Primary
-                    </button>
-                    <button
-                      type="button"
-                      className={`rounded-full px-2 py-0.5 text-xs transition-colors ${
-                        supabaseClient === 'secondary'
-                          ? 'bg-slate-900 text-slate-50 shadow-sm'
-                          : 'text-slate-700 hover:text-slate-900'
-                      }`}
-                      aria-pressed={supabaseClient === 'secondary'}
-                      onClick={() => setSupabaseClient('secondary')}
-                    >
-                      Secondary
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </header>
-
           {page === 'upload' && (
             <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <h2 className="text-sm font-semibold">Upload file</h2>
@@ -157,6 +156,12 @@ export default function App() {
           {page === 'records' && (
             <section className="flex min-h-0 flex-1 flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <RecordsManagement />
+            </section>
+          )}
+
+          {page === 'search' && (
+            <section className="flex min-h-0 flex-1 flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <SearchRecords />
             </section>
           )}
 

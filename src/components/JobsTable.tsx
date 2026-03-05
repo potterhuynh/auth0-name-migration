@@ -82,7 +82,7 @@ export function JobsTable() {
         ) : (
           <div className="max-h-96 overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm">
             <table className="min-w-full text-sm">
-              <thead className="bg-slate-100">
+              <thead className="sticky top-0 z-10 bg-slate-100 [&_th]:bg-slate-100">
                 <tr>
                   <th className="px-3 py-2 text-left">User ID</th>
                   <th className="px-3 py-2 text-left">Name</th>
