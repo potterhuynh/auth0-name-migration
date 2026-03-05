@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { listJobs, listJobRecords } from '../lib/jobs';
 import { Button } from './ui/button';
+import { useSupabaseClientSelection } from './SupabaseClientContext';
 
 export function JobsTable() {
+  const { supabaseClient } = useSupabaseClientSelection();
   const [jobs, setJobs] = useState<any[]>([]);
   const [selectedJob, setSelectedJob] = useState<any | null>(null);
   const [records, setRecords] = useState<any[]>([]);
@@ -10,16 +12,16 @@ export function JobsTable() {
 
   useEffect(() => {
     (async () => {
-      const data = await listJobs();
+      const data = await listJobs(supabaseClient);
       setJobs(data);
     })();
-  }, []);
+  }, [supabaseClient]);
 
   const loadRecords = async (job: any) => {
     setSelectedJob(job);
     setLoadingRecords(true);
     try {
-      const data = await listJobRecords(String(job.id));
+      const data = await listJobRecords(String(job.id), supabaseClient);
       setRecords(data);
     } finally {
       setLoadingRecords(false);
