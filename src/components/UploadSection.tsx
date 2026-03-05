@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { Upload, FileJson, Eye, Trash2 } from 'lucide-react';
+import { Upload, Eye, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Spinner } from './ui/spinner';
 import { ingestFile } from '../lib/api';
