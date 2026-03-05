@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Trash2, ExternalLink } from 'lucide-react';
 import { listJobs, deleteJobAndRecords, getJobRecordSummary } from '../lib/jobs';
 import { Button } from './ui/button';
 import { Spinner } from './ui/spinner';
-import { DispatchJobModal } from './DispatchJobModal';
 import { StatusBadge } from './StatusBadge';
 import { useSupabaseClientSelection } from './SupabaseClientContext';
 
@@ -15,11 +15,11 @@ export function JobsManagement() {
   const [page, setPage] = useState(1);
   const pageSize = 20;
   const [totalJobs, setTotalJobs] = useState(0);
-  const [dispatchJob, setDispatchJob] = useState<JobRow | null>(null);
   const [jobToDelete, setJobToDelete] = useState<JobRow | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const { supabaseClient } = useSupabaseClientSelection();
+  const navigate = useNavigate();
 
   const loadJobs = async (pageToLoad: number) => {
     setLoading(true);
@@ -73,7 +73,7 @@ export function JobsManagement() {
         <div>
           <h2 className="text-sm font-semibold">Jobs management</h2>
           <p className="text-xs text-muted-foreground">
-            View and refresh recent migration jobs. Use Start name backfill to dispatch.
+            View and refresh recent migration jobs. Open records to view a job’s migration records.
           </p>
         </div>
         <Button
@@ -147,9 +147,11 @@ export function JobsManagement() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => setDispatchJob(job)}
+                        onClick={() => navigate(`/records?job_id=${job.id}`)}
+                        className="gap-1"
                       >
-                        Start name backfill
+                        <ExternalLink className="size-3.5" />
+                        Open records
                       </Button>
                       <Button
                         size="sm"
@@ -208,16 +210,6 @@ export function JobsManagement() {
           </div>
         )}
       </div>
-
-      {dispatchJob && (
-        <DispatchJobModal
-          job={dispatchJob}
-          onClose={() => setDispatchJob(null)}
-          onSuccess={() => {
-            void loadJobs(page);
-          }}
-        />
-      )}
 
       {jobToDelete && (
         <div

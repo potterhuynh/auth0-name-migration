@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { listJobs, listJobRecords, getJobRecordSummary } from '../lib/jobs';
 import type { MigrationJobRecord } from '../types/migration';
 import type { JobRecordSummary } from '../lib/jobs';
@@ -31,16 +32,23 @@ export function RecordsManagement() {
     { id: number; job_key: string; total_records: number } | null
   >(null);
   const { supabaseClient } = useSupabaseClientSelection();
+  const [searchParams] = useSearchParams();
+  const jobIdFromUrl = searchParams.get('job_id');
 
   useEffect(() => {
     (async () => {
       const data = await listJobs(supabaseClient);
       setJobs(data);
-      if (data.length && !selectedJobId) {
-        setSelectedJobId(String(data[0].id));
+      if (data.length) {
+        const idFromUrl =
+          jobIdFromUrl != null &&
+          data.some((j) => String(j.id) === jobIdFromUrl)
+            ? jobIdFromUrl
+            : null;
+        setSelectedJobId(idFromUrl ?? String(data[0].id));
       }
     })();
-  }, [selectedJobId, supabaseClient]);
+  }, [jobIdFromUrl, supabaseClient]);
 
   const refreshSelectedJobData = useCallback(
     async (jobId: string, mode: 'initial' | 'refresh' = 'refresh') => {
@@ -239,6 +247,8 @@ export function RecordsManagement() {
                   <tr>
                     <th className="px-3 py-2 text-left">User ID</th>
                     <th className="px-3 py-2 text-left">Name</th>
+                    <th className="px-3 py-2 text-left">Google</th>
+                    <th className="px-3 py-2 text-left">Apple</th>
                     <th className="px-3 py-2 text-left">Old / Updated</th>
                     <th className="px-3 py-2 text-left">Status</th>
                     <th className="px-3 py-2 text-right">Attempts</th>
@@ -264,7 +274,7 @@ export function RecordsManagement() {
                   {!filteredRecords.length && (
                     <tr>
                       <td
-                        colSpan={9}
+                        colSpan={11}
                         className="px-3 py-4 text-center text-xs text-muted-foreground"
                       >
                         {records.length
