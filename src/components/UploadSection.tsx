@@ -132,7 +132,7 @@ export function UploadSection() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const loadHistory = useCallback(() => {
     setHistoryLoading(true);
-    listUploadHistory(supabaseClient, { limit: 20 })
+    listUploadHistory(supabaseClient)
       .then(setUploadHistory)
       .catch(() => setUploadHistory([]))
       .finally(() => setHistoryLoading(false));

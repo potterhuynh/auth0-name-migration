@@ -80,15 +80,12 @@ export async function insertUploadHistory(
  */
 export async function listUploadHistory(
   client: SupabaseClientName,
-  options?: { limit?: number },
 ): Promise<UploadHistoryRow[]> {
-  const limit = options?.limit ?? 50;
   const supabase = getSupabaseClient(client);
   const { data, error } = await supabase
     .from('upload_history')
     .select('id, job_key, file_name, storage_path, file_size, record_count, created_at')
-    .order('created_at', { ascending: false })
-    .limit(limit);
+    .order('job_key', { ascending: true });
 
   if (error) {
     console.warn('Upload history list failed (table may not exist):', error.message);
