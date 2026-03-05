@@ -1,15 +1,19 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { Upload, FileJson } from 'lucide-react';
+import { Upload, FileJson, Eye, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Spinner } from './ui/spinner';
 import { ingestFile } from '../lib/api';
-import { jobKeyExists } from '../lib/jobs';
+import { listJobs } from '../lib/jobs';
 import { cn } from '../lib/cn';
 
 function jobKeyFromFile(file: File): string {
   const base = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_') || 'upload';
   return base;
+}
+
+function isJsonFile(f: File): boolean {
+  return f.name.toLowerCase().endsWith('.json') || f.type === 'application/json';
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -20,12 +24,22 @@ type UploadRecord = {
 };
 
 export function UploadSection() {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [status, setStatus] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [uploadingJobKey, setUploadingJobKey] = useState<string | null>(null);
+  const [uploadAllInProgress, setUploadAllInProgress] = useState(false);
+  const [existingJobKeys, setExistingJobKeys] = useState<Set<string>>(new Set());
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    if (files.length === 0) return;
+    listJobs()
+      .then((jobs) => setExistingJobKeys(new Set(jobs.map((j) => j.job_key))))
+      .catch(() => setExistingJobKeys(new Set()));
+  }, [files.length]);
+
+  const [previewingIndex, setPreviewingIndex] = useState<number | null>(null);
   const [previewRecords, setPreviewRecords] = useState<UploadRecord[]>([]);
   const [skippedRecords, setSkippedRecords] = useState<UploadRecord[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -36,7 +50,7 @@ export function UploadSection() {
   const [page, setPage] = useState(1);
   const pageSize = 25;
 
-  const parseFileToEmailRecords = async (f: File) => {
+  const parseFileToEmailRecords = useCallback(async (f: File) => {
     const text = await f.text();
     const data = JSON.parse(text);
     if (!Array.isArray(data)) {
@@ -50,87 +64,109 @@ export function UploadSection() {
       (r) => !r || typeof r.name !== 'string' || !EMAIL_REGEX.test(r.name),
     );
     return { validRecords: emailRecords, skippedRecords: skipped, total: records.length };
-  };
+  }, []);
 
-  const loadPreviewForFile = async (f: File) => {
-    setPreviewLoading(true);
-    setPreviewError(null);
-    try {
-      const { validRecords, skippedRecords: skipped, total } = await parseFileToEmailRecords(f);
-      setPreviewRecords(validRecords);
-      setSkippedRecords(skipped);
-      setTotalRecords(total);
-      setActiveTab('valid');
-      setPage(1);
-    } catch (err: unknown) {
+  const loadPreviewForFile = useCallback(
+    async (f: File) => {
+      setPreviewLoading(true);
+      setPreviewError(null);
+      try {
+        const { validRecords, skippedRecords: skipped, total } = await parseFileToEmailRecords(f);
+        setPreviewRecords(validRecords);
+        setSkippedRecords(skipped);
+        setTotalRecords(total);
+        setActiveTab('valid');
+        setPage(1);
+      } catch (err: unknown) {
+        setPreviewRecords([]);
+        setSkippedRecords([]);
+        setTotalRecords(0);
+        setPreviewError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setPreviewLoading(false);
+      }
+    },
+    [parseFileToEmailRecords],
+  );
+
+  const addFiles = useCallback((newFiles: FileList | File[]) => {
+    const list = Array.from(newFiles);
+    const jsonOnly = list.filter(isJsonFile);
+    setFiles((prev) => [...prev, ...jsonOnly]);
+    setStatus(null);
+    if (list.length !== jsonOnly.length) {
+      toast('Only .json files were added.', { icon: 'ℹ️' });
+    }
+  }, []);
+
+  const removeFile = useCallback((index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+    if (previewingIndex === index) {
+      setPreviewingIndex(null);
       setPreviewRecords([]);
       setSkippedRecords([]);
       setTotalRecords(0);
-      setPreviewError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setPreviewLoading(false);
+      setPreviewError(null);
+    } else if (previewingIndex !== null && previewingIndex > index) {
+      setPreviewingIndex(previewingIndex - 1);
     }
-  };
+  }, [previewingIndex]);
 
-  const setFileFromInput = (f: File | null) => {
-    if (f && !f.name.toLowerCase().endsWith('.json') && f.type !== 'application/json') return;
-    setFile(f);
-    setStatus(null);
-    setPreviewError(null);
-    setPreviewRecords([]);
-    setSkippedRecords([]);
-    setTotalRecords(0);
-    setActiveTab('valid');
-    setPage(1);
+  const handlePreviewRecords = useCallback(
+    async (index: number) => {
+      const f = files[index];
+      if (!f) return;
+      setPreviewingIndex(index);
+      setPreviewError(null);
+      await loadPreviewForFile(f);
+    },
+    [files, loadPreviewForFile],
+  );
 
-    if (f) {
-      void loadPreviewForFile(f);
-    }
-  };
-
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!file) return;
-
-    setLoading(true);
-    setStatus(null);
-
-    try {
+  const uploadOneFile = useCallback(
+    async (file: File) => {
       const jobKey = jobKeyFromFile(file);
-      if (await jobKeyExists(jobKey)) {
-        const msg = `Job key "${jobKey}" already exists. Rename the file or delete the existing job before uploading.`;
-        setStatus(msg);
-        toast.error(msg);
+      if (existingJobKeys.has(jobKey)) {
+        toast.error(`Job key "${jobKey}" already exists.`);
         return;
       }
-
-      let recordsToUpload = previewRecords;
-
-      if (!recordsToUpload.length) {
-        // Fallback: parse file now if preview hasn't run or failed.
+      setUploadingJobKey(jobKey);
+      setStatus(null);
+      try {
         const { validRecords } = await parseFileToEmailRecords(file);
-        recordsToUpload = validRecords;
-      }
-
-      if (!recordsToUpload.length) {
-        const msg = 'No records with a valid email-format name to upload.';
-        setStatus(msg);
+        if (!validRecords.length) {
+          toast.error('No records with a valid email-format name to upload.');
+          return;
+        }
+        const res = await ingestFile(jobKey, validRecords);
+        const okMsg = `Ingested ${res.total_records ?? validRecords.length} records for job ${res.job_key}`;
+        toast.success(okMsg);
+        setStatus(okMsg);
+        setExistingJobKeys((prev) => new Set([...prev, res.job_key]));
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
         toast.error(msg);
-        return;
+        setStatus(`Error: ${msg}`);
+      } finally {
+        setUploadingJobKey(null);
       }
+    },
+    [parseFileToEmailRecords, existingJobKeys],
+  );
 
-      const res = await ingestFile(jobKey, recordsToUpload);
-      const okMsg = `Ingested ${res.total_records ?? recordsToUpload.length} records for job ${res.job_key}`;
-      setStatus(okMsg);
-      toast.success(okMsg);
-    } catch (err: unknown) {
-      const msg = `Error: ${err instanceof Error ? err.message : String(err)}`;
-      setStatus(msg);
-      toast.error(msg);
-    } finally {
-      setLoading(false);
+  const uploadAll = useCallback(async () => {
+    if (!files.length) return;
+    setUploadAllInProgress(true);
+    setStatus(null);
+    let done = 0;
+    for (let i = 0; i < files.length; i++) {
+      await uploadOneFile(files[i]);
+      done++;
+      setStatus(`Uploaded ${done} of ${files.length} files.`);
     }
-  };
+    setStatus(`Finished uploading ${done} file(s).`);
+    setUploadAllInProgress(false);
+  }, [files, uploadOneFile]);
 
   const q = previewQuery.trim().toLowerCase();
   const baseRecords = activeTab === 'valid' ? previewRecords : skippedRecords;
@@ -151,16 +187,24 @@ export function UploadSection() {
   const pageRecords = filteredPreview.slice(start, start + pageSize);
 
   const skipped = skippedRecords.length;
+  const anyUploading = !!uploadingJobKey || uploadAllInProgress;
+  const uploadableCount = files.filter((f) => !existingJobKeys.has(jobKeyFromFile(f))).length;
+  const allJobsExist = files.length > 0 && uploadableCount === 0;
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <div className="space-y-4">
       <div className="space-y-1">
-        <label className="block text-sm font-medium text-slate-700">JSON file</label>
+        <label className="block text-sm font-medium text-slate-700">JSON files</label>
         <input
           ref={inputRef}
           type="file"
           accept=".json,application/json"
-          onChange={(e) => setFileFromInput(e.target.files?.[0] ?? null)}
+          multiple
+          onChange={(e) => {
+            const chosen = e.target.files;
+            if (chosen?.length) addFiles(chosen);
+            e.target.value = '';
+          }}
           className="sr-only"
           tabIndex={-1}
           aria-hidden
@@ -184,8 +228,8 @@ export function UploadSection() {
             e.preventDefault();
             e.stopPropagation();
             setDragOver(false);
-            const f = e.dataTransfer.files?.[0];
-            if (f) setFileFromInput(f);
+            const dropped = e.dataTransfer.files;
+            if (dropped?.length) addFiles(dropped);
           }}
           className={cn(
             'relative flex min-h-[140px] cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed transition-colors',
@@ -195,34 +239,115 @@ export function UploadSection() {
               : 'border-muted-foreground/25 bg-muted/30 hover:border-muted-foreground/40 hover:bg-muted/50',
           )}
         >
-          {file ? (
-            <>
-              <FileJson className="size-10 text-primary" strokeWidth={1.5} />
-              <span className="text-sm font-medium text-foreground">{file.name}</span>
-              <span className="text-xs text-muted-foreground">
-                {(file.size / 1024).toFixed(1)} KB · click or drop to replace
-              </span>
-            </>
-          ) : (
-            <>
-              <Upload className="size-10 text-muted-foreground" strokeWidth={1.5} />
-              <span className="text-sm font-medium text-foreground">
-                Drag file here or click to browse
-              </span>
-              <span className="text-xs text-muted-foreground">.json only</span>
-            </>
-          )}
+          <Upload className="size-10 text-muted-foreground" strokeWidth={1.5} />
+          <span className="text-sm font-medium text-foreground">
+            Drag files here or click to browse
+          </span>
+          <span className="text-xs text-muted-foreground">
+            .json only · multiple files allowed
+          </span>
         </div>
         <p className="text-xs text-muted-foreground">
-          Job key will be the file name (e.g. users_export). Only records whose <code>name</code>{' '}
-          is a valid email will be uploaded.
+          Job key per file is derived from the file name. Only records whose <code>name</code> is a
+          valid email will be uploaded.
         </p>
       </div>
 
+      {files.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-slate-700">Files ready for upload</span>
+            <Button
+              type="button"
+              size="sm"
+              onClick={uploadAll}
+              disabled={anyUploading || allJobsExist}
+            >
+              {uploadAllInProgress && <Spinner className="mr-2 h-3.5 w-3.5" />}
+              Upload all
+            </Button>
+          </div>
+          <div className="rounded-md border bg-card">
+            <table className="min-w-full text-sm">
+              <thead className="bg-muted/60">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium text-slate-700">File</th>
+                  <th className="px-3 py-2 text-left font-medium text-slate-700">Size</th>
+                  <th className="px-3 py-2 text-right font-medium text-slate-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {files.map((f, index) => {
+                  const jobKey = jobKeyFromFile(f);
+                  const isUploading = uploadingJobKey === jobKey;
+                  const isPreviewing = previewingIndex === index;
+                  const jobExists = existingJobKeys.has(jobKey);
+                  return (
+                    <tr
+                      key={`${f.name}-${index}`}
+                      className={cn(
+                        'border-t border-border/60',
+                        isPreviewing && 'bg-primary/5',
+                      )}
+                    >
+                      <td className="px-3 py-2">
+                        <span className="font-medium text-foreground">{f.name}</span>
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground">
+                        {(f.size / 1024).toFixed(1)} KB
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            type="button"
+                            size="xs"
+                            variant="outline"
+                            disabled={anyUploading}
+                            onClick={() => handlePreviewRecords(index)}
+                            className="gap-1"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            Preview records
+                          </Button>
+                          <Button
+                            type="button"
+                            size="xs"
+                            disabled={anyUploading || jobExists}
+                            onClick={() => uploadOneFile(f)}
+                            className="gap-1"
+                            title={jobExists ? `Job "${jobKey}" already exists` : undefined}
+                          >
+                            {isUploading && <Spinner className="h-3.5 w-3.5" />}
+                            <Upload className="h-3.5 w-3.5" />
+                            Upload
+                          </Button>
+                          <Button
+                            type="button"
+                            size="xs"
+                            variant="ghost"
+                            className="text-muted-foreground hover:text-destructive"
+                            disabled={anyUploading}
+                            onClick={() => removeFile(index)}
+                            aria-label="Remove file"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {previewingIndex !== null && files[previewingIndex] && (
       <div className="space-y-2 rounded-md border bg-card text-card-foreground">
         <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2 text-xs text-muted-foreground">
           <span className="text-[11px] font-medium uppercase tracking-wide text-primary">
-            Preview
+            Preview: {files[previewingIndex].name}
           </span>
           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -325,11 +450,9 @@ export function UploadSection() {
                       colSpan={2}
                       className="px-3 py-3 text-center text-[11px] text-muted-foreground"
                     >
-                      {!file
-                        ? 'Select a file to preview records.'
-                        : activeTab === 'valid'
-                          ? 'No records with email-format names in this file.'
-                          : 'No skipped records without email-format names.'}
+                      {activeTab === 'valid'
+                        ? 'No records with email-format names in this file.'
+                        : 'No skipped records without email-format names.'}
                     </td>
                   </tr>
                 )}
@@ -369,14 +492,10 @@ export function UploadSection() {
           </div>
         )}
       </div>
-
-      <Button type="submit" disabled={loading || !file}>
-        {loading && <Spinner className="mr-2 h-3.5 w-3.5" />}
-        {loading ? 'Uploading…' : 'Upload & ingest'}
-      </Button>
+      )}
 
       {status && <p className="text-sm text-slate-600">{status}</p>}
-    </form>
+    </div>
   );
 }
 
