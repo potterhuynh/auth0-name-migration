@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { listJobs, listJobRecords, getJobRecordSummary } from '../lib/jobs';
 import type { MigrationJobRecord } from '../types/migration';
 import type { JobRecordSummary } from '../lib/jobs';
-import { supabase } from '../lib/supabase';
+import { getSupabaseClient } from '../lib/supabase';
+import { useSupabaseClientSelection } from './SupabaseClientContext';
 import { Spinner } from './ui/spinner';
 import { DispatchJobModal } from './DispatchJobModal';
 import { RecordsHeader } from './RecordsHeader';
@@ -29,16 +30,17 @@ export function RecordsManagement() {
   const [dispatchJob, setDispatchJob] = useState<
     { id: number; job_key: string; total_records: number } | null
   >(null);
+  const { supabaseClient } = useSupabaseClientSelection();
 
   useEffect(() => {
     (async () => {
-      const data = await listJobs();
+      const data = await listJobs(supabaseClient);
       setJobs(data);
       if (data.length && !selectedJobId) {
         setSelectedJobId(String(data[0].id));
       }
     })();
-  }, [selectedJobId]);
+  }, [selectedJobId, supabaseClient]);
 
   const refreshSelectedJobData = useCallback(
     async (jobId: string, mode: 'initial' | 'refresh' = 'refresh') => {
@@ -49,8 +51,8 @@ export function RecordsManagement() {
       }
       try {
         const [data, summaryData] = await Promise.all([
-          listJobRecords(jobId),
-          getJobRecordSummary(jobId),
+          listJobRecords(jobId, supabaseClient),
+          getJobRecordSummary(jobId, supabaseClient),
         ]);
         setRecords(data);
         setSummary(summaryData);
@@ -62,7 +64,7 @@ export function RecordsManagement() {
         }
       }
     },
-    [],
+    [supabaseClient],
   );
 
   useEffect(() => {
@@ -84,6 +86,7 @@ export function RecordsManagement() {
       }, 300);
     };
 
+    const supabase = getSupabaseClient(supabaseClient);
     const channel = supabase
       .channel(`migration-job-records-${selectedJobId}`)
       .on(
@@ -104,7 +107,7 @@ export function RecordsManagement() {
       }
       void supabase.removeChannel(channel);
     };
-  }, [refreshSelectedJobData, selectedJobId]);
+  }, [refreshSelectedJobData, selectedJobId, supabaseClient]);
 
   useEffect(() => {
     setPage(1);

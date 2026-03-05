@@ -3,6 +3,7 @@ import type { MigrationJobRecord } from '../types/migration';
 import { retryRecord } from '../lib/api';
 import { StatusBadge } from './StatusBadge';
 import { Button } from './ui/button';
+import { useSupabaseClientSelection } from './SupabaseClientContext';
 
 type RecordRowProps = {
   record: MigrationJobRecord;
@@ -12,12 +13,13 @@ type RecordRowProps = {
 
 export function RecordRow({ record, jobKey, onRefresh }: RecordRowProps) {
   const [isRetrying, setIsRetrying] = useState(false);
+  const { supabaseClient } = useSupabaseClientSelection();
 
   const handleRetry = async () => {
     if (!jobKey || isRetrying) return;
     try {
       setIsRetrying(true);
-      await retryRecord(jobKey, record.user_id);
+      await retryRecord(jobKey, record.user_id, supabaseClient);
       await onRefresh();
     } catch (err) {
       // eslint-disable-next-line no-console

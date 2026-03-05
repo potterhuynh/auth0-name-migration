@@ -6,6 +6,7 @@ import { Spinner } from './ui/spinner';
 import { ingestFile } from '../lib/api';
 import { listJobs } from '../lib/jobs';
 import { cn } from '../lib/cn';
+import { useSupabaseClientSelection } from './SupabaseClientContext';
 
 function jobKeyFromFile(file: File): string {
   const base = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_') || 'upload';
@@ -24,6 +25,7 @@ type UploadRecord = {
 };
 
 export function UploadSection() {
+  const { supabaseClient } = useSupabaseClientSelection();
   const [files, setFiles] = useState<File[]>([]);
   const [status, setStatus] = useState<string | null>(null);
   const [uploadingJobKey, setUploadingJobKey] = useState<string | null>(null);
@@ -34,10 +36,10 @@ export function UploadSection() {
 
   useEffect(() => {
     if (files.length === 0) return;
-    listJobs()
+    listJobs(supabaseClient)
       .then((jobs) => setExistingJobKeys(new Set(jobs.map((j) => j.job_key))))
       .catch(() => setExistingJobKeys(new Set()));
-  }, [files.length]);
+  }, [files.length, supabaseClient]);
 
   const [previewingIndex, setPreviewingIndex] = useState<number | null>(null);
   const [previewRecords, setPreviewRecords] = useState<UploadRecord[]>([]);
@@ -138,7 +140,7 @@ export function UploadSection() {
           toast.error('No records with a valid email-format name to upload.');
           return;
         }
-        const res = await ingestFile(jobKey, validRecords);
+        const res = await ingestFile(jobKey, validRecords, supabaseClient);
         const okMsg = `Ingested ${res.total_records ?? validRecords.length} records for job ${res.job_key}`;
         toast.success(okMsg);
         setStatus(okMsg);
@@ -151,7 +153,7 @@ export function UploadSection() {
         setUploadingJobKey(null);
       }
     },
-    [parseFileToEmailRecords, existingJobKeys],
+    [parseFileToEmailRecords, existingJobKeys, supabaseClient],
   );
 
   const uploadAll = useCallback(async () => {

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { startBackfill } from '../lib/api';
 import { Button } from './ui/button';
 import { cn } from '../lib/cn';
+import { useSupabaseClientSelection } from './SupabaseClientContext';
 
 type JobRow = { id: number; job_key: string; total_records: number };
 
@@ -12,6 +13,7 @@ type DispatchJobModalProps = {
 };
 
 export function DispatchJobModal({ job, onClose, onSuccess }: DispatchJobModalProps) {
+  const { supabaseClient } = useSupabaseClientSelection();
   const [limit, setLimit] = useState(100);
   const [useAll, setUseAll] = useState(false);
   const [status, setStatus] = useState<string>('pending');
@@ -35,7 +37,7 @@ export function DispatchJobModal({ job, onClose, onSuccess }: DispatchJobModalPr
     setError(null);
     onClose();
     try {
-      await startBackfill(job.job_key, effectiveLimit, status);
+      await startBackfill(job.job_key, effectiveLimit, status, supabaseClient);
       await Promise.resolve(onSuccess());
     } catch (err) {
       console.error('Failed to dispatch job', err);

@@ -5,25 +5,33 @@ import { Button } from './ui/button';
 import { Spinner } from './ui/spinner';
 import { DispatchJobModal } from './DispatchJobModal';
 import { StatusBadge } from './StatusBadge';
+import { useSupabaseClientSelection } from './SupabaseClientContext';
 
 type JobRow = { id: number; job_key: string; status: string; total_records: number; processed_records: number; success_records: number; failed_records: number };
 
 export function JobsManagement() {
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
+  const [totalJobs, setTotalJobs] = useState(0);
   const [dispatchJob, setDispatchJob] = useState<JobRow | null>(null);
   const [jobToDelete, setJobToDelete] = useState<JobRow | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const { supabaseClient } = useSupabaseClientSelection();
 
-  const loadJobs = async () => {
+  const loadJobs = async (pageToLoad: number) => {
     setLoading(true);
     try {
-      const data = await listJobs();
+      const { jobs: data, total } = await listJobs<JobRow>(supabaseClient, {
+        page: pageToLoad,
+        pageSize,
+      });
       const jobsWithCounts = await Promise.all(
         data.map(async (job: any) => {
           try {
-            const summary = await getJobRecordSummary(String(job.id));
+            const summary = await getJobRecordSummary(String(job.id), supabaseClient);
             const processed = summary.success + summary.failed;
             return {
               ...job,
@@ -39,14 +47,25 @@ export function JobsManagement() {
         }),
       );
       setJobs(jobsWithCounts);
+      setTotalJobs(total);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    void loadJobs();
-  }, []);
+    setPage(1);
+  }, [supabaseClient]);
+
+  useEffect(() => {
+    void loadJobs(page);
+  }, [page, supabaseClient]);
+
+  const total = totalJobs;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const start = (currentPage - 1) * pageSize;
+  const pageJobs = jobs;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
@@ -57,79 +76,146 @@ export function JobsManagement() {
             View and refresh recent migration jobs. Use Start name backfill to dispatch.
           </p>
         </div>
-        <Button size="sm" variant="outline" onClick={loadJobs} disabled={loading}>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            void loadJobs(page);
+          }}
+          disabled={loading}
+        >
           {loading && <Spinner className="h-3 w-3" />}
           {loading ? 'Refreshing…' : 'Refresh'}
         </Button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto rounded-md border bg-card text-card-foreground shadow-sm">
-        <table className="min-w-full text-sm">
-          <thead className="bg-muted/60">
-            <tr>
-              <th className="px-3 py-2 text-left">Job key</th>
-              <th className="px-3 py-2 text-left">Status</th>
-              <th className="px-3 py-2 text-right">Total</th>
-              <th className="px-3 py-2 text-right">Processed</th>
-              <th className="px-3 py-2 text-right">Success</th>
-              <th className="px-3 py-2 text-right">Failed</th>
-              <th className="px-3 py-2 text-left">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {jobs.map((job) => (
-              <tr key={job.id} className="border-t border-border/60">
-                <td className="px-3 py-2">{job.job_key}</td>
-                <td className="px-3 py-2">
-                  <StatusBadge status={job.status} />
-                </td>
-                <td className="px-3 py-2 text-right">{job.total_records}</td>
-                <td className="px-3 py-2 text-right">{job.processed_records}</td>
-                <td className="px-3 py-2 text-right">{job.success_records}</td>
-                <td className="px-3 py-2 text-right">{job.failed_records}</td>
-                <td className="px-3 py-2">
-                  <div className="flex items-center gap-1">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setDispatchJob(job)}
-                    >
-                      Start name backfill
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => {
-                        setDeleteError(null);
-                        setJobToDelete(job);
-                      }}
-                      title="Delete job and all records"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {!jobs.length && !loading && (
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border bg-card text-card-foreground shadow-sm">
+        {total > 0 && (
+          <div className="flex items-center justify-between border-b px-3 py-1.5 text-[11px] text-muted-foreground">
+            <span>
+              Rows {start + 1}-{Math.min(start + pageSize, total)} of {total}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                className="rounded-md border border-input bg-background px-2 py-1 text-[11px] disabled:opacity-50"
+                disabled={currentPage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Prev
+              </button>
+              <span>
+                Page {currentPage} of {pageCount}
+              </span>
+              <button
+                type="button"
+                className="rounded-md border border-input bg-background px-2 py-1 text-[11px] disabled:opacity-50"
+                disabled={currentPage >= pageCount}
+                onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+        <div className="min-h-0 flex-1 overflow-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-muted/60">
               <tr>
-                <td
-                  colSpan={7}
-                  className="px-3 py-4 text-center text-xs text-muted-foreground"
-                >
-                  No jobs yet.
-                </td>
+                <th className="px-3 py-2 text-left">Job key</th>
+                <th className="px-3 py-2 text-left">Status</th>
+                <th className="px-3 py-2 text-right">Total</th>
+                <th className="px-3 py-2 text-right">Processed</th>
+                <th className="px-3 py-2 text-right">Success</th>
+                <th className="px-3 py-2 text-right">Failed</th>
+                <th className="px-3 py-2 text-left">Actions</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {pageJobs.map((job) => (
+                <tr key={job.id} className="border-t border-border/60">
+                  <td className="px-3 py-2">{job.job_key}</td>
+                  <td className="px-3 py-2">
+                    <StatusBadge status={job.status} />
+                  </td>
+                  <td className="px-3 py-2 text-right">{job.total_records}</td>
+                  <td className="px-3 py-2 text-right">{job.processed_records}</td>
+                  <td className="px-3 py-2 text-right">{job.success_records}</td>
+                  <td className="px-3 py-2 text-right">{job.failed_records}</td>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setDispatchJob(job)}
+                      >
+                        Start name backfill
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => {
+                          setDeleteError(null);
+                          setJobToDelete(job);
+                        }}
+                        title="Delete job and all records"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {!jobs.length && !loading && (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="px-3 py-4 text-center text-xs text-muted-foreground"
+                  >
+                    No jobs yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {total > 0 && (
+          <div className="flex items-center justify-between border-t px-3 py-1.5 text-[11px] text-muted-foreground">
+            <span>
+              Rows {start + 1}-{Math.min(start + pageSize, total)} of {total}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                className="rounded-md border border-input bg-background px-2 py-1 text-[11px] disabled:opacity-50"
+                disabled={currentPage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Prev
+              </button>
+              <span>
+                Page {currentPage} of {pageCount}
+              </span>
+              <button
+                type="button"
+                className="rounded-md border border-input bg-background px-2 py-1 text-[11px] disabled:opacity-50"
+                disabled={currentPage >= pageCount}
+                onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {dispatchJob && (
         <DispatchJobModal
           job={dispatchJob}
           onClose={() => setDispatchJob(null)}
-          onSuccess={loadJobs}
+          onSuccess={() => {
+            void loadJobs(page);
+          }}
         />
       )}
 
@@ -174,9 +260,9 @@ export function JobsManagement() {
                   setDeleting(true);
                   setDeleteError(null);
                   try {
-                    await deleteJobAndRecords(jobToDelete);
+                    await deleteJobAndRecords(jobToDelete, supabaseClient);
                     setJobToDelete(null);
-                    await loadJobs();
+                    await loadJobs(page);
                   } catch (err) {
                     setDeleteError(err instanceof Error ? err.message : String(err));
                   } finally {

@@ -1,5 +1,6 @@
-import { supabase } from './supabase';
+import { getSupabaseClient } from './supabase';
 import type { MigrationJobRecord } from '../types/migration';
+import type { SupabaseClientName } from '../types/supabaseClient';
 
 export type JobRecordSummary = {
   total: number;
@@ -8,23 +9,67 @@ export type JobRecordSummary = {
   pending: number;
 };
 
-export async function listJobs() {
-  const { data, error } = await supabase
+type ListJobsPageOptions = {
+  page: number;
+  pageSize: number;
+};
+
+type ListJobsPageResult<TJob> = {
+  jobs: TJob[];
+  total: number;
+};
+
+export async function listJobs<TJob = any>(
+  client: SupabaseClientName,
+): Promise<TJob[]>;
+export async function listJobs<TJob = any>(
+  client: SupabaseClientName,
+  options: ListJobsPageOptions,
+): Promise<ListJobsPageResult<TJob>>;
+export async function listJobs<TJob = any>(
+  client: SupabaseClientName,
+  options?: ListJobsPageOptions,
+): Promise<TJob[] | ListJobsPageResult<TJob>> {
+  const supabase = getSupabaseClient(client);
+  const shouldPaginate = !!options;
+  const page = options?.page ?? 1;
+  const pageSize = options?.pageSize ?? 50;
+  const from = shouldPaginate ? Math.max(0, (page - 1) * pageSize) : undefined;
+  const to = shouldPaginate && from !== undefined ? from + pageSize - 1 : undefined;
+
+  let query = supabase
     .from('migration_jobs')
     .select(
       'id, job_key, status, total_records, processed_records, success_records, failed_records, created_at, updated_at',
+      { count: 'exact' },
     )
-    .order('created_at', { ascending: false })
-    .limit(50);
+    .order('created_at', { ascending: true });
+
+  if (shouldPaginate && from !== undefined && to !== undefined) {
+    query = query.range(from, to);
+  }
+
+  const { data, error, count } = await query;
 
   if (error) {
     throw error;
   }
 
-  return data ?? [];
+  if (shouldPaginate) {
+    return {
+      jobs: (data ?? []) as TJob[],
+      total: count ?? (data?.length ?? 0),
+    };
+  }
+
+  return (data ?? []) as TJob[];
 }
 
-export async function listJobRecords(jobId: string): Promise<MigrationJobRecord[]> {
+export async function listJobRecords(
+  jobId: string,
+  client: SupabaseClientName,
+): Promise<MigrationJobRecord[]> {
+  const supabase = getSupabaseClient(client);
   const { data, error } = await supabase
     .from('migration_job_records')
     .select(
@@ -40,7 +85,11 @@ export async function listJobRecords(jobId: string): Promise<MigrationJobRecord[
   return data ?? [];
 }
 
-export async function getJobRecordSummary(jobId: string): Promise<JobRecordSummary> {
+export async function getJobRecordSummary(
+  jobId: string,
+  client: SupabaseClientName,
+): Promise<JobRecordSummary> {
+  const supabase = getSupabaseClient(client);
   const table = supabase.from('migration_job_records');
 
   const [
@@ -70,7 +119,11 @@ export async function getJobRecordSummary(jobId: string): Promise<JobRecordSumma
   };
 }
 
-export async function jobKeyExists(jobKey: string): Promise<boolean> {
+export async function jobKeyExists(
+  jobKey: string,
+  client: SupabaseClientName,
+): Promise<boolean> {
+  const supabase = getSupabaseClient(client);
   const { count, error } = await supabase
     .from('migration_jobs')
     .select('id', { count: 'exact', head: true })
@@ -83,7 +136,11 @@ export async function jobKeyExists(jobKey: string): Promise<boolean> {
   return (count ?? 0) > 0;
 }
 
-export async function deleteJobRecords(jobId: string): Promise<void> {
+export async function deleteJobRecords(
+  jobId: string,
+  client: SupabaseClientName,
+): Promise<void> {
+  const supabase = getSupabaseClient(client);
   const { error } = await supabase
     .from('migration_job_records')
     .delete()
@@ -92,7 +149,11 @@ export async function deleteJobRecords(jobId: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function deleteJob(jobId: number): Promise<void> {
+export async function deleteJob(
+  jobId: number,
+  client: SupabaseClientName,
+): Promise<void> {
+  const supabase = getSupabaseClient(client);
   const { error } = await supabase
     .from('migration_jobs')
     .delete()
@@ -101,8 +162,11 @@ export async function deleteJob(jobId: number): Promise<void> {
   if (error) throw error;
 }
 
-export async function deleteJobAndRecords(job: { id: number }): Promise<void> {
-  await deleteJobRecords(String(job.id));
-  await deleteJob(job.id);
+export async function deleteJobAndRecords(
+  job: { id: number },
+  client: SupabaseClientName,
+): Promise<void> {
+  await deleteJobRecords(String(job.id), client);
+  await deleteJob(job.id, client);
 }
 

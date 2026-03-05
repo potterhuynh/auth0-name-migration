@@ -90,11 +90,11 @@ export function withPasswordAuth<P extends object>(
 
     if (status === 'unauthenticated') {
       return (
-        <div className="flex min-h-screen items-center justify-center bg-slate-900 text-slate-50">
-          <div className="w-full max-w-xs space-y-4 rounded-xl bg-slate-800 p-6 shadow-lg">
+        <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-900">
+          <div className="w-full max-w-xs space-y-4 rounded-xl bg-white p-6 shadow-lg">
             <div className="space-y-1 text-center">
               <h1 className="text-lg font-semibold">Protected dashboard</h1>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500">
                 Enter the access password to continue.
               </p>
             </div>

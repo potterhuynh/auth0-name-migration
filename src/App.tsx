@@ -4,6 +4,7 @@ import { UploadSection } from './components/UploadSection';
 import { JobsManagement } from './components/JobsManagement';
 import { RecordsManagement } from './components/RecordsManagement';
 import { Button } from './components/ui/button';
+import { useSupabaseClientSelection } from './components/SupabaseClientContext';
 
 type Page = 'upload' | 'jobs' | 'records' | 'settings';
 
@@ -31,6 +32,7 @@ function pathFromPage(page: Page): string {
 export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { supabaseClient, setSupabaseClient } = useSupabaseClientSelection();
 
   useEffect(() => {
     if (location.pathname === '/') {
@@ -92,13 +94,48 @@ export default function App() {
 
         {/* Main content */}
         <main className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto">
-          <header className="md:hidden">
-            <h1 className="text-xl font-semibold tracking-tight">
-              Auth0 Name Migration Dashboard
-            </h1>
-            <p className="mt-1 text-xs text-slate-500">
-              Upload JSON files, start name backfill, and monitor Supabase history.
-            </p>
+          <header className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h1 className="text-base font-semibold tracking-tight md:text-lg">
+                  Auth0 Name Migration Dashboard
+                </h1>
+                <p className="mt-1 text-xs text-slate-500">
+                  Upload JSON files, start name backfill, and monitor Supabase history.
+                </p>
+              </div>
+              <div className="flex justify-start md:justify-end">
+                <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs shadow-sm">
+                  <span className="text-slate-500">Supabase client</span>
+                  <div className="inline-flex rounded-full bg-white p-0.5">
+                    <button
+                      type="button"
+                      className={`rounded-full px-2 py-0.5 text-xs transition-colors ${
+                        supabaseClient === 'primary'
+                          ? 'bg-slate-900 text-slate-50 shadow-sm'
+                          : 'text-slate-700 hover:text-slate-900'
+                      }`}
+                      aria-pressed={supabaseClient === 'primary'}
+                      onClick={() => setSupabaseClient('primary')}
+                    >
+                      Primary
+                    </button>
+                    <button
+                      type="button"
+                      className={`rounded-full px-2 py-0.5 text-xs transition-colors ${
+                        supabaseClient === 'secondary'
+                          ? 'bg-slate-900 text-slate-50 shadow-sm'
+                          : 'text-slate-700 hover:text-slate-900'
+                      }`}
+                      aria-pressed={supabaseClient === 'secondary'}
+                      onClick={() => setSupabaseClient('secondary')}
+                    >
+                      Secondary
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </header>
 
           {page === 'upload' && (
@@ -138,6 +175,17 @@ export default function App() {
                   points to your local lambda URL.
                 </li>
                 <li>
+                  Primary Supabase project:
+                  <span className="ml-1">
+                    <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">
+                      VITE_SUPABASE_PRIMARY_URL
+                    </code>
+                    ,{' '}
+                    <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">
+                      VITE_SUPABASE_PRIMARY_ANON_KEY
+                    </code>
+                  </span>
+                  . If unset,{' '}
                   <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">
                     VITE_SUPABASE_URL
                   </code>{' '}
@@ -145,7 +193,20 @@ export default function App() {
                   <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">
                     VITE_SUPABASE_ANON_KEY
                   </code>{' '}
-                  match your Supabase project.
+                  are used as a fallback.
+                </li>
+                <li>
+                  Secondary Supabase project (optional):
+                  <span className="ml-1">
+                    <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">
+                      VITE_SUPABASE_SECONDARY_URL
+                    </code>
+                    ,{' '}
+                    <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">
+                      VITE_SUPABASE_SECONDARY_ANON_KEY
+                    </code>
+                  </span>
+                  .
                 </li>
               </ul>
             </section>
