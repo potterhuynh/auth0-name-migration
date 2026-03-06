@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 import { listJobs, listJobRecords, getJobRecordSummary } from '../lib/jobs';
 import type { MigrationJobRecord } from '../types/migration';
 import type { JobRecordSummary } from '../lib/jobs';
-import { getSupabaseClient } from '../lib/supabase';
 import { useSupabaseClientSelection } from './SupabaseClientContext';
 import { Spinner } from './ui/spinner';
 import { DispatchJobModal } from './DispatchJobModal';
@@ -89,40 +88,14 @@ export function RecordsManagement() {
     void refreshSelectedJobData(selectedJobId, 'initial');
   }, [refreshSelectedJobData, selectedJobId]);
 
+  // Poll records every 3s when a job is selected
   useEffect(() => {
     if (!selectedJobId) return;
-
-    let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
-    const scheduleRefresh = () => {
-      if (refreshTimeout) return;
-      refreshTimeout = setTimeout(() => {
-        refreshTimeout = null;
-        void refreshSelectedJobData(selectedJobId);
-      }, 300);
-    };
-
-    const supabase = getSupabaseClient(supabaseClient);
-    const channel = supabase
-      .channel(`migration-job-records-${selectedJobId}-${supabaseClient}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'migration_job_records',
-          filter: `job_id=eq.${selectedJobId}`,
-        },
-        scheduleRefresh,
-      )
-      .subscribe();
-
-    return () => {
-      if (refreshTimeout) {
-        clearTimeout(refreshTimeout);
-      }
-      void channel.unsubscribe();
-    };
-  }, [refreshSelectedJobData, selectedJobId, supabaseClient]);
+    const interval = setInterval(() => {
+      void refreshSelectedJobData(selectedJobId);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [refreshSelectedJobData, selectedJobId]);
 
   useEffect(() => {
     setPage(1);
@@ -215,7 +188,7 @@ export function RecordsManagement() {
         ) : (
           <div className="flex min-h-0 flex-1 flex-col">
             {refreshing && (
-              <div className="flex items-center gap-2 border-b px-3 py-1.5 text-[11px] text-muted-foreground">
+              <div className="fixed left-0 right-0 top-0 z-50 flex items-center justify-center gap-2 border-b bg-card px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm">
                 <Spinner className="h-3 w-3" />
                 Refreshing…
               </div>
